@@ -1,4 +1,3 @@
-useOrinAddr = True
 def clienthelloprocess(csession, ssession, p):
     return p
 

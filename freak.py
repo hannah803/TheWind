@@ -6,6 +6,9 @@ import struct
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_v1_5
 
+useOrinAddr = False
+doProcess = True
+
 #ip = 'passport.suning.com'
 ip = '119.188.139.98'
 ip = '182.118.77.102'
@@ -20,7 +23,6 @@ ip = '58.83.157.190'
 '''
 port = 443
 
-DoProcess = True
 def getKnownKeys():
     Ns = {}
     f = open('keys.list', 'r')

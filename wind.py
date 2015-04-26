@@ -11,11 +11,11 @@ from header import *
 ###used in this framework. You can refer to forward.py to find out which methods you need to
 ###implement. And in freak.py you can figure out the implementation of SSL Freak Attack.
 
-###the compulsory arguments you need to supply is ***useOrinAddr*** and ***DoProcess***
+###the compulsory arguments you need to supply is ***useOrinAddr*** and ***doProcess***
 
 
-useOrinAddr = False
-DoProcess = False
+useOrinAddr = True
+doProcess = False
 
 #from freak import *
 from forward import *
@@ -45,7 +45,7 @@ class ServerHandler(SocketServer.BaseRequestHandler):
                     p = TLSRecord(data)
                     #print data.encode('hex')
                     #print str(p).encode('hex')
-                    if not DoProcess:
+                    if not doProcess:
                         if readable == csock:
                             ssock.sendall(str(p))
                         else:
