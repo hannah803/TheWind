@@ -83,7 +83,7 @@ def lookup(address, port, s):
 
 def get_original_addr(csock):
     output = subprocess.check_output("uname")
-    if not output == "Linux":
+    if not output.strip() == "Linux":
         address, port = csock.getpeername()
         s = subprocess.check_output(("sudo", "-n", "/sbin/pfctl", "-s", "state"), stderr=subprocess.STDOUT)
         return lookup(address, port, s)
