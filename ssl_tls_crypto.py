@@ -137,7 +137,8 @@ class TLSSessionCtx(object):
             macLen, keyLen, ivLen = (16, 16, 0)
             self.params.negotiated.mac = md5
         else:
-            raise ValueError('CS not supported yet!!!')
+            pass
+            #raise ValueError('CS not supported yet!!!')
 
         self.crypto.session.key.length.mac = macLen
         self.crypto.session.key.length.encryption = keyLen
