@@ -2,6 +2,7 @@
 # -*- coding: UTF-8 -*-
 # Author : tintinweb@oststrom.com <github.com/tintinweb>
 # http://www.secdev.org/projects/scapy/doc/build_dissect.html
+from header import * 
 import Crypto
 from Crypto.Hash import HMAC, MD5, SHA
 from Crypto.Util.asn1 import DerSequence
@@ -11,17 +12,13 @@ from Crypto.PublicKey import RSA
 from Crypto.Cipher import AES, ARC4, PKCS1_v1_5
 import hashlib
 from Crypto.Cipher import PKCS1_v1_5#,PKCS1_OAEP
-from scapy.layers.inet import TCP, UDP, IP
-from scapy.layers.ssl_tls import TLSHandshake,TLSServerHello,TLSClientHello,TLSCertificateList, \
-                    TLSClientKeyExchange,TLSKexParamEncryptedPremasterSecret, \
-                    TLS_CIPHER_SUITES, TLSRecord, TLSCiphertextDecrypted, \
-                    TLSCiphertextMAC
-import struct
+
 import array
 from collections import namedtuple
 from hashlib import md5,sha1,sha256
 import hmac
 from prf import prfForVersion
+
 
 
 class TLSSessionCtx(object):
@@ -126,19 +123,10 @@ class TLSSessionCtx(object):
 
     def parseCipherSuite(self):
         cs = self.params.negotiated.ciphersuite
-        if cs == 0x0035:
-            macLen, keyLen, ivLen = (20, 32, 16)
-            self.params.negotiated.mac = sha1
-        elif cs == 0x0003:
-            macLen, keyLen, ivLen = (16, 5, 0)
-            self.params.negotiated.isexport = True
-            self.params.negotiated.mac = md5
-        elif cs == 0x0004:
-            macLen, keyLen, ivLen = (16, 16, 0)
-            self.params.negotiated.mac = md5
-        else:
-            pass
-            #raise ValueError('CS not supported yet!!!')
+        macLen = HASH_LENGTH[crypto_params[TLS_CIPHER_SUITE_REGISTRY[cs]]['hash']['name']]
+        keyLen = crypto_params[TLS_CIPHER_SUITE_REGISTRY[cs]]['cipher']['keyLen']
+        blocksize = crypto_params[TLS_CIPHER_SUITE_REGISTRY[cs]]['cipher']['type'].block_size
+        ivLen = 0 if blocksize == 1 else blocksize
 
         self.crypto.session.key.length.mac = macLen
         self.crypto.session.key.length.encryption = keyLen

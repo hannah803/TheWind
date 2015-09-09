@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 # encoding: utf-8
-import select, SocketServer, socket, struct
-from scapy.all import *
 
 ###This is the main framework that accepts connection and launch connections to (ip, port).
 ###You only need to change the import directive to include your process methods and arguments
@@ -11,10 +9,7 @@ from scapy.all import *
 ###the compulsory arguments you need to supply is ***useOrinAddr*** and ***doProcess***
 
 
-from handlessl import *
 from handleovpn import *
-
-#print useOrinAddr
 
 class ServerHandler(SocketServer.BaseRequestHandler):
 

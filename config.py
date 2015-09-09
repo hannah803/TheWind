@@ -1,11 +1,12 @@
-from ovpnpassive import *
-useOrinAddr = True
-SSL = False
-#SSL = True
-#OPENVPN = False
-OPENVPN = True
+from OpenSSL import crypto
+from replaceCert import *
 
-b_process = False
+useOrinAddr = True
+
+SSL = True
+OPENVPN = False
+
+b_process = True
 
 iplist = []
-portlist = [1194]
+portlist = [443]

@@ -1,16 +1,14 @@
-import socket, select, struct
-from scapy.layers.ssl_tls import TLSRecord
 from handlessl import *
 
-
 class HandleOPENVPN:
-    client_ctl_begin = False
-    client_ctl_end = False
-    server_ctl_begin = False
-    server_ctl_end = False
-    client_content = ""
-    server_content = ""
-    handlessl = HandleSSL()
+    def __init__(self):
+        self.client_ctl_begin = False
+        self.client_ctl_end = False
+        self.server_ctl_begin = False
+        self.server_ctl_end = False
+        self.client_content = ""
+        self.server_content = ""
+        self.handlessl = HandleSSL()
 
     def handle(self, p, label):
         if p.opcode == 4:
@@ -24,6 +22,7 @@ class HandleOPENVPN:
                         length = struct.unpack('>H',self.server_content[pro_len+3:pro_len+5])[0]
                         logging.info(length)
                         payload = self.server_content[pro_len:pro_len+5+length]
+                        logging.info(self.handlessl)
                         self.handlessl.handle(TLSRecord(payload), 'server')
                         logging.info(payload.encode('hex'))
                         pro_len = pro_len+5+length
@@ -46,6 +45,7 @@ class HandleOPENVPN:
                         length = struct.unpack('>H',self.client_content[pro_len+3:pro_len+5])[0]
                         logging.info(length)
                         payload = self.client_content[pro_len:pro_len+5+length]
+                        logging.info(self.handlessl)
                         self.handlessl.handle(TLSRecord(payload), 'client')
                         logging.info(payload.encode('hex'))
                         pro_len = pro_len+5+length

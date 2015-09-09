@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 #encoding: utf-8
 
-import socket, struct, sys, subprocess
+import socket, SocketServer,  struct, sys, subprocess, select
 from scapy.all import *
+from Crypto.PublicKey import RSA
+from Crypto.Cipher import PKCS1_v1_5
+from OpenSSL import crypto
+
 PORT = 8888
 SO_ORIGINAL_DST = 80
 
@@ -51,6 +55,64 @@ def get_original_addr(csock):
     _, port, a1, a2, a3, a4 = struct.unpack("!HHBBBBxxxxxxxx", odestdata)
     address = "%d.%d.%d.%d" % (a1, a2, a3, a4)
     return address, port
+
+class NullCipher(object):
+    """ Implements a pycrypto like interface for the Null Cipher
+    """
+    
+    block_size = 0
+    key_size = 0
+    
+    @classmethod
+    def new(cls, *args, **kwargs):
+        return cls()
+    
+    def encrypt(self, cleartext):
+        return cleartext
+    
+    def decrypt(self, ciphertext):
+        return ciphertext
+
+class NullHash(object):
+    """ Implements a pycrypto like interface for the Null Hash
+    """
+
+    blocksize = 0
+    digest_size = 0
+    
+    def __init__(self, *args, **kwargs):
+        pass
+    
+    @classmethod
+    def new(cls, *args, **kwargs):
+        return cls(*args, **kwargs)
+    
+    def update(self, data):
+        pass
+    
+    def digest(self):
+        return ""
+    
+    def hexdigest(self):
+        return ""
+    
+    def copy(self):
+        return copy.deepcopy(self)
+
+class DHE(object):
+    pass
+
+
+HASH_LENGTH = {
+    "NONE":     0,
+    "MD5":      16,
+    "SHA":      20,
+    "SHA224":   28,
+    "SHA256":   32,
+    "SHA384":   48,
+    "SHA512":   64
+ }
+
 
 TLS_CIPHER_SUITE_REGISTRY = {
     0x0000: 'NULL_WITH_NULL_NULL',
@@ -122,6 +184,13 @@ TLS_CIPHER_SUITE_REGISTRY = {
     0x0044: 'DHE_DSS_WITH_CAMELLIA_128_CBC_SHA',
     0x0045: 'DHE_RSA_WITH_CAMELLIA_128_CBC_SHA',
     0x0046: 'DH_anon_WITH_CAMELLIA_128_CBC_SHA',
+    0x0060: 'RSA_EXPORT1024_WITH_RC4_56_MD5',
+    0x0061: 'RSA_EXPORT1024_WITH_RC2_CBC_56_MD5',
+    0x0062: 'RSA_EXPORT1024_WITH_DES_CBC_SHA',
+    0x0063: 'DHE_DSS_EXPORT1024_WITH_DES_CBC_SHA',
+    0x0064: 'RSA_EXPORT1024_WITH_RC4_56_SHA',
+    0x0065: 'DHE_DSS_EXPORT1024_WITH_RC4_56_SHA',
+    0x0066: 'DHE_DSS_WITH_RC4_128_SHA',
     0x0067: 'DHE_RSA_WITH_AES_128_CBC_SHA256',
     0x0068: 'DH_DSS_WITH_AES_256_CBC_SHA256',
     0x0069: 'DH_RSA_WITH_AES_256_CBC_SHA256',
@@ -374,6 +443,42 @@ TLS_CIPHER_SUITE_REGISTRY = {
     0xc0af: 'ECDHE_ECDSA_WITH_AES_256_CCM_8',
 }
 
+crypto_params = {
+    'NULL_WITH_NULL_NULL':             {"name":TLS_CIPHER_SUITE_REGISTRY[0x0000], "export":False, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":NullCipher, "name":"Null", "keyLen":0, "mode":None, "mode_name":""}, "hash":{"type":NullHash, "name":"Null"}},
+    'RSA_WITH_NULL_MD5':               {"name":TLS_CIPHER_SUITE_REGISTRY[0x0001], "export":False, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":NullCipher, "name":"Null", "keyLen":0, "mode":None, "mode_name":""}, "hash":{"type":MD5, "name":"MD5"}},
+    'RSA_WITH_NULL_SHA':               {"name":TLS_CIPHER_SUITE_REGISTRY[0x0002], "export":False, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":NullCipher, "name":"Null", "keyLen":0, "mode":None, "mode_name":""}, "hash":{"type":SHA, "name":"SHA"}},
+    'RSA_EXPORT_WITH_RC4_40_MD5':      {"name":TLS_CIPHER_SUITE_REGISTRY[0x0003], "export":True, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":ARC4, "name":"RC4", "keyLen":5, "mode":None, "mode_name":"Stream"}, "hash":{"type":MD5, "name":"MD5"}},
+    'RSA_WITH_RC4_128_MD5':            {"name":TLS_CIPHER_SUITE_REGISTRY[0x0004], "export":False, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":ARC4, "name":"RC4", "keyLen":16, "mode":None, "mode_name":"Stream"}, "hash":{"type":MD5, "name":"MD5"}},
+    'RSA_WITH_RC4_128_SHA':            {"name":TLS_CIPHER_SUITE_REGISTRY[0x0005], "export":False, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":ARC4, "name":"RC4", "keyLen":16, "mode":None, "mode_name":"Stream"}, "hash":{"type":SHA, "name":"SHA"}},
+    'RSA_EXPORT_WITH_RC2_CBC_40_MD5':  {"name":TLS_CIPHER_SUITE_REGISTRY[0x0006], "export":True, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":ARC2, "name":"RC2", "keyLen":5, "mode":ARC2.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":MD5, "name":"MD5"}},
+    # 0x0007: RSA_WITH_IDEA_CBC_SHA => IDEA support would require python openssl bindings
+    'RSA_EXPORT_WITH_DES40_CBC_SHA':   {"name":TLS_CIPHER_SUITE_REGISTRY[0x0008], "export":True, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":DES, "name":"DES", "keyLen":5, "mode":DES.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'RSA_WITH_DES_CBC_SHA':            {"name":TLS_CIPHER_SUITE_REGISTRY[0x0009], "export":False, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":DES, "name":"DES", "keyLen":8, "mode":DES.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'RSA_WITH_3DES_EDE_CBC_SHA':       {"name":TLS_CIPHER_SUITE_REGISTRY[0x000a], "export":False, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":DES3, "name":"DES3", "keyLen":24, "mode":DES3.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'RSA_WITH_AES_128_CBC_SHA':        {"name":TLS_CIPHER_SUITE_REGISTRY[0x002f], "export":False, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":AES, "name":"AES", "keyLen":16, "mode":AES.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'RSA_WITH_AES_256_CBC_SHA':        {"name":TLS_CIPHER_SUITE_REGISTRY[0x0035], "export":False, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":AES, "name":"AES", "keyLen":32, "mode":AES.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'RSA_WITH_NULL_SHA256':            {"name":TLS_CIPHER_SUITE_REGISTRY[0x003b], "export":False, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":NullCipher, "name":"Null", "keyLen":0, "mode":None, "mode_name":""}, "hash":{"type":SHA256, "name":"SHA256"}},
+    'RSA_EXPORT1024_WITH_RC4_56_MD5':  {"name":TLS_CIPHER_SUITE_REGISTRY[0x0060], "export":True, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":ARC4, "name":"RC4", "keyLen":8, "mode":None, "mode_name":"Stream"}, "hash":{"type":MD5, "name":"MD5"}},
+    'RSA_EXPORT1024_WITH_RC2_CBC_56_MD5': {"name":TLS_CIPHER_SUITE_REGISTRY[0x0061], "export":True, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":ARC2, "name":"RC2", "keyLen":8, "mode":ARC2.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":MD5, "name":"MD5"}},
+    'RSA_EXPORT1024_WITH_DES_CBC_SHA': {"name":TLS_CIPHER_SUITE_REGISTRY[0x0062], "export":True, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":DES, "name":"DES", "keyLen":8, "mode":DES.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'RSA_EXPORT1024_WITH_RC4_56_SHA':  {"name":TLS_CIPHER_SUITE_REGISTRY[0x0064], "export":True, "key_exchange":{"type":RSA, "name":RSA, "sig":None}, "cipher":{"type":ARC4, "name":"RC4", "keyLen":8, "mode":None, "mode_name":"Stream"}, "hash":{"type":SHA, "name":"SHA"}},
+    # 0x0084: RSA_WITH_CAMELLIA_256_CBC_SHA => Camelia support should use camcrypt or the camelia patch for pycrypto
+    'DHE_DSS_EXPORT_WITH_DES40_CBC_SHA':   {"name":TLS_CIPHER_SUITE_REGISTRY[0x0011], "export":True, "key_exchange":{"type":DHE, "name":DHE, "sig":DSA}, "cipher":{"type":DES, "name":"DES", "keyLen":5, "mode":DES.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'DHE_DSS_WITH_DES_CBC_SHA':        {"name":TLS_CIPHER_SUITE_REGISTRY[0x0012], "export":False, "key_exchange":{"type":DHE, "name":DHE, "sig":DSA}, "cipher":{"type":DES, "name":"DES", "keyLen":8, "mode":DES.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'DHE_DSS_WITH_3DES_EDE_CBC_SHA':   {"name":TLS_CIPHER_SUITE_REGISTRY[0x0013], "export":False, "key_exchange":{"type":DHE, "name":DHE, "sig":DSA}, "cipher":{"type":DES3, "name":"DES3", "keyLen":24, "mode":DES3.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'DHE_RSA_EXPORT_WITH_DES40_CBC_SHA':   {"name":TLS_CIPHER_SUITE_REGISTRY[0x0014], "export":True, "key_exchange":{"type":DHE, "name":DHE, "sig":RSA}, "cipher":{"type":DES, "name":"DES", "keyLen":5, "mode":DES.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'DHE_RSA_WITH_DES_CBC_SHA':        {"name":TLS_CIPHER_SUITE_REGISTRY[0x0015], "export":False, "key_exchange":{"type":DHE, "name":DHE, "sig":RSA}, "cipher":{"type":DES, "name":"DES", "keyLen":8, "mode":DES.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'DHE_RSA_WITH_3DES_EDE_CBC_SHA':   {"name":TLS_CIPHER_SUITE_REGISTRY[0x0016], "export":False, "key_exchange":{"type":DHE, "name":DHE, "sig":RSA}, "cipher":{"type":DES3, "name":"DES3", "keyLen":24, "mode":DES3.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'DHE_DSS_WITH_AES_128_CBC_SHA':    {"name":TLS_CIPHER_SUITE_REGISTRY[0x0032], "export":False, "key_exchange":{"type":DHE, "name":DHE, "sig":DSA}, "cipher":{"type":AES, "name":"AES", "keyLen":16, "mode":AES.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'DHE_RSA_WITH_AES_128_CBC_SHA':    {"name":TLS_CIPHER_SUITE_REGISTRY[0x0033], "export":False, "key_exchange":{"type":DHE, "name":DHE, "sig":RSA}, "cipher":{"type":AES, "name":"AES", "keyLen":16, "mode":AES.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'DHE_DSS_WITH_AES_256_CBC_SHA':    {"name":TLS_CIPHER_SUITE_REGISTRY[0x0038], "export":False, "key_exchange":{"type":DHE, "name":DHE, "sig":DSA}, "cipher":{"type":AES, "name":"AES", "keyLen":32, "mode":AES.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'DHE_RSA_WITH_AES_256_CBC_SHA':    {"name":TLS_CIPHER_SUITE_REGISTRY[0x0039], "export":False, "key_exchange":{"type":DHE, "name":DHE, "sig":RSA}, "cipher":{"type":AES, "name":"AES", "keyLen":32, "mode":AES.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'DHE_DSS_EXPORT1024_WITH_DES_CBC_SHA': {"name":TLS_CIPHER_SUITE_REGISTRY[0x0063], "export":True, "key_exchange":{"type":DHE, "name":DHE, "sig":DSA}, "cipher":{"type":DES, "name":"DES", "keyLen":8, "mode":DES.MODE_CBC, "mode_name":"CBC"}, "hash":{"type":SHA, "name":"SHA"}},
+    'DHE_DSS_EXPORT1024_WITH_RC4_56_SHA':  {"name":TLS_CIPHER_SUITE_REGISTRY[0x0065], "export":True, "key_exchange":{"type":DHE, "name":DHE, "sig":DSA}, "cipher":{"type":ARC4, "name":"RC4", "keyLen":8, "mode":None, "mode_name":"Stream"}, "hash":{"type":SHA, "name":"SHA"}},
+    'DHE_DSS_WITH_RC4_128_SHA':            {"name":TLS_CIPHER_SUITE_REGISTRY[0x0066], "export":False, "key_exchange":{"type":DHE, "name":DHE, "sig":DSA}, "cipher":{"type":ARC4, "name":"RC4", "keyLen":16, "mode":None, "mode_name":"Stream"}, "hash":{"type":SHA, "name":"SHA"}},
+    # 0x0087: DHE_DSS_WITH_CAMELLIA_256_CBC_SHA => Camelia support should use camcrypt or the camelia patch for pycrypto
+    # 0x0088: DHE_RSA_WITH_CAMELLIA_256_CBC_SHA => Camelia support should use camcrypt or the camelia patch for pycrypto
+}
 def parseCS(num):
     return TLS_CIPHER_SUITE_REGISTRY[num]
 

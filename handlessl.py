@@ -1,6 +1,4 @@
-from ssl_tls_crypto import TLSSessionCtx
-import socket, select, struct
-from header import *
+from ssl_tls_crypto import *
 from config import *
 
 CHANGE_CIPHER_SPEC = 20
@@ -21,11 +19,12 @@ FINISHED = 20
 CERTIFICATE_STATUS = 22
 
 class HandleSSL:
-    clientfinished = False
-    serverfinished = False
-    csession = TLSSessionCtx()
-    ssession = TLSSessionCtx()
-    process = False
+    def __init__(self):
+        self.clientfinished = False
+        self.serverfinished = False
+        self.csession = TLSSessionCtx()
+        self.ssession = TLSSessionCtx()
+        self.process = False
 
     def handle(self, p, label):
         content_type = p.content_type

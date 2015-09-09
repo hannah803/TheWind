@@ -34,8 +34,16 @@ def handle(filename,menu,lb):
 def sslPassive():
     handle("sslpassivecfg",sslmenu,"SSLPassiveStop")
 
+def sslRepCert():
+    handle("sslrepcertcfg",sslmenu,"SSLRepCertStop")
+
+def sslFreak():
+    handle("sslfreakcfg",sslmenu,"SSLFreakStop")
+
 def ovpnPassive():
     handle("ovpnpassivecfg",ovpnmenu,"OvpnPassiveStop")
+
+
 
 root=Tk()
 root.title("The Wind")
@@ -45,6 +53,8 @@ menubar=Menu(root)
 
 sslmenu=Menu(menubar,tearoff=0)
 sslmenu.add_command(label='SSLPassive',command=sslPassive)
+sslmenu.add_command(label='SSLReplaceCert',command=sslRepCert)
+sslmenu.add_command(label='SSLFreak',command=sslFreak)
 sslmenu.add_separator()
 menubar.add_cascade(label='SSL', menu=sslmenu)
 
