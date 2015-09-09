@@ -1,8 +1,14 @@
-from scapy.all import *
+from header import *
+
 def clienthelloprocess(csession, ssession, p):
+    print "Version:%s"%(TLS_VERSIONS[p[TLSHandshake].version])
+    print "ClientRandom:%s"%p[TLSHandshake].random_bytes.encode('hex')
     return p
 
 def serverhelloprocess(csession, ssession, p):
+    print "ServerRandom:%s"%p[TLSHandshake].random_bytes.encode('hex')
+    print "CipherSuite:%s"%parseCS(p[TLSHandshake].cipher_suite)
+    print "CompressionMethod:%s"%p[TLSHandshake].compression_method
     return p
 
 def certificateprocess(csession, ssession, p):
